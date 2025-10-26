@@ -146,12 +146,16 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - REACT_APP_WS_URL=ws://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm start
+      - REACT_APP_API_URL=/api/ecg/latest
+      - REACT_APP_GATEWAY_URL=/api
+    depends_on:
+      - gateway
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
 
 volumes:
   postgres_data:
