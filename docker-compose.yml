@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ecg_postgres
+    environment:
+      POSTGRES_DB: ecg_db
+      POSTGRES_USER: ecg_user
+      POSTGRES_PASSWORD: ecg_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecg_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: ecg_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mosquitto MQTT Broker
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: ecg_mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/config:/mosquitto/config
+      - ./mqtt/data:/mosquitto/data
+      - ./mqtt/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: ecg_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/0
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+      - ECG_SERVICE_URL=http://ecg-service:8001
+      - IOT_SERVICE_URL=http://iot-service:8002
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    volumes:
+      - ./gateway:/app
+    command: python manage.py runserver 0.0.0.0:8000
+
+  # ECG Processing Service
+  ecg-service:
+    build:
+      context: ./services/ecg_service
+      dockerfile: Dockerfile
+    container_name: ecg_service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/ecg_service:/app
+    command: python manage.py runserver 0.0.0.0:8001
+
+  # IoT/MQTT Service
+  iot-service:
+    build:
+      context: ./services/iot_service
+      dockerfile: Dockerfile
+    container_name: iot_service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/2
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    volumes:
+      - ./services/iot_service:/app
+    command: python manage.py runserver 0.0.0.0:8002
+
+  # Celery Worker for async tasks
+  celery-worker:
+    build:
+      context: ./services/ecg_service
+      dockerfile: Dockerfile
+    container_name: ecg_celery_worker
+    environment:
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - postgres
+      - redis
+      - mqtt
+    volumes:
+      - ./services/ecg_service:/app
+    command: celery -A ecg_service worker --loglevel=info
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecg_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm start
+
+volumes:
+  postgres_data:
+  redis_data:
