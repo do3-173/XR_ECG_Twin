@@ -10,9 +10,11 @@ services:
       POSTGRES_USER: ecg_user
       POSTGRES_PASSWORD: ecg_password
     ports:
-      - "5432:5432"
+      - "5433:5432"  # External 5433 to avoid conflict
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecg_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ecg_user"]
       interval: 10s
@@ -27,6 +29,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - ecg_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -38,17 +42,60 @@ services:
     image: eclipse-mosquitto:2
     container_name: ecg_mqtt
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "1884:1883"  # External 1884 to avoid conflict with user's existing broker
+      - "9002:9001"  # External 9002 to avoid conflict
     volumes:
       - ./mqtt/config:/mosquitto/config
       - ./mqtt/data:/mosquitto/data
       - ./mqtt/log:/mosquitto/log
+    networks:
+      - ecg_network
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Node-RED for data processing
+  nodered:
+    build:
+      context: ./nodered
+      dockerfile: Dockerfile
+    container_name: ecg_nodered
+    ports:
+      - "1880:1880"
+    environment:
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    volumes:
+      - ./nodered/flows.json:/data/flows.json
+      - ./nodered/settings.js:/data/settings.js
+      - nodered_data:/data
+    networks:
+      - ecg_network
+
+  # Smartwatch Simulator
+  simulator:
+    build:
+      context: .
+      dockerfile: ./simulator/Dockerfile
+    container_name: ecg_simulator
+    environment:
+      - MQTT_BROKER=mqtt
+      - MQTT_PORT=1883
+      - PARTICIPANT=1           # Participant ID (1-10)
+      - SESSION=1               # Session number (default: 1)
+      - MAX_VIDEOS=1            # Max videos per participant (all 7 versions)
+      # - RANDOM_PARTICIPANTS=1  # Uncomment to randomly select participants
+    depends_on:
+      mqtt:
+        condition: service_healthy
+    networks:
+      - ecg_network
+    restart: unless-stopped
 
   # API Gateway
   gateway:
@@ -65,6 +112,7 @@ services:
       - MQTT_PORT=1883
       - ECG_SERVICE_URL=http://ecg-service:8001
       - IOT_SERVICE_URL=http://iot-service:8002
+      - NODE_RED_URL=http://nodered:1880
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +122,8 @@ services:
         condition: service_healthy
     volumes:
       - ./gateway:/app
+    networks:
+      - ecg_network
     command: python manage.py runserver 0.0.0.0:8000
 
   # ECG Processing Service
@@ -94,6 +144,8 @@ services:
         condition: service_healthy
     volumes:
       - ./services/ecg_service:/app
+    networks:
+      - ecg_network
     command: python manage.py runserver 0.0.0.0:8001
 
   # IoT/MQTT Service
@@ -105,10 +157,17 @@ services:
     ports:
       - "8002:8002"
     environment:
+      - POSTGRES_DB=ecg_db
+      - POSTGRES_USER=ecg_user
+      - POSTGRES_PASSWORD=ecg_password
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
       - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
       - REDIS_URL=redis://redis:6379/2
       - MQTT_BROKER=mqtt
       - MQTT_PORT=1883
+      - MQTT_TOPIC=smartwatch/data
+      - RUN_MAIN=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,24 +177,9 @@ services:
         condition: service_healthy
     volumes:
       - ./services/iot_service:/app
+    networks:
+      - ecg_network
     command: python manage.py runserver 0.0.0.0:8002
-
-  # Celery Worker for async tasks
-  celery-worker:
-    build:
-      context: ./services/ecg_service
-      dockerfile: Dockerfile
-    container_name: ecg_celery_worker
-    environment:
-      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
-      - REDIS_URL=redis://redis:6379/1
-    depends_on:
-      - postgres
-      - redis
-      - mqtt
-    volumes:
-      - ./services/ecg_service:/app
-    command: celery -A ecg_service worker --loglevel=info
 
   # Frontend (React)
   frontend:
@@ -144,19 +188,36 @@ services:
       dockerfile: Dockerfile
     container_name: ecg_frontend
     ports:
-      - "3000:3000"
+      - "3001:80"  # Port 3000 is in use, using 3001 instead
     environment:
-      - REACT_APP_API_URL=/api/ecg/latest
-      - REACT_APP_GATEWAY_URL=/api
+      - REACT_APP_API_URL=http://localhost:8000/api/ecg/latest
+      - REACT_APP_GATEWAY_URL=http://localhost:8000/api
     depends_on:
       - gateway
     networks:
-      - default
+      - ecg_network
+
+  # Frontend VR (React - HoloLens optimized)
+  frontend-vr:
+    build:
+      context: ./frontend-vr
+      dockerfile: Dockerfile
+    container_name: ecg_frontend_vr
+    ports:
+      - "3002:80"  # VR version on port 3002
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api/ecg/latest
+      - REACT_APP_GATEWAY_URL=http://localhost:8000/api
+    depends_on:
+      - gateway
+    networks:
+      - ecg_network
 
 networks:
-  default:
+  ecg_network:
     driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
+  nodered_data:

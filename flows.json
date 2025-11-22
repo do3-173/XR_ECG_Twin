@@ -1,0 +1,386 @@
+[
+    {
+        "id": "181d12fedac13429",
+        "type": "tab",
+        "label": "ECG Smartwatch Monitoring",
+        "disabled": false,
+        "info": "Flow for receiving ECG data from the smartwatch simulator"
+    },
+    {
+        "id": "dbf1e70f89747be5",
+        "type": "mqtt in",
+        "z": "181d12fedac13429",
+        "name": "Smartwatch Data",
+        "topic": "smartwatch/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "76c7f9bc32d8c907",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 120,
+        "wires": [
+            [
+                "24a3c111ca7334b4",
+                "b321b8c7226a78d8"
+            ]
+        ]
+    },
+    {
+        "id": "24a3c111ca7334b4",
+        "type": "function",
+        "z": "181d12fedac13429",
+        "name": "Process ECG Data",
+        "func": "const timestamp = msg.payload.timestamp;\nconst heartRate = msg.payload.heart_rate;\nconst zone = msg.payload.zone;\nconst ecgSamples = msg.payload.ecg_samples;\n\nlet heartRateHistory = flow.get('heartRateHistory') || [];\n\nif (heartRateHistory.length > 60) {\n    heartRateHistory.shift();\n}\n\nheartRateHistory.push({\n    time: timestamp,\n    value: heartRate,\n    zone: zone\n});\n\nflow.set('heartRateHistory', heartRateHistory);\nflow.set('latestECGSamples', ecgSamples);\nflow.set('latestHeartRate', heartRate);\nflow.set('latestZone', zone);\n\nconst status = {\n    timestamp: timestamp,\n    heartRate: heartRate,\n    zone: zone,\n    zoneText: getZoneText(zone),\n    samples: ecgSamples\n};\n\nmsg.payload = status;\nreturn msg;\n\nfunction getZoneText(zone) {\n    switch(zone) {\n        case 0: return 'Below Normal';\n        case 1: return 'Rest';\n        case 2: return 'Light Activity';\n        case 3: return 'Moderate Activity';\n        case 4: return 'Intense Activity';\n        case 5: return 'Maximum Effort';\n        default: return 'Unknown';\n    }\n}",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 120,
+        "wires": [
+            [
+                "2e755578a651a4a8",
+                "08b836d27a6e56d4"
+            ]
+        ]
+    },
+    {
+        "id": "b321b8c7226a78d8",
+        "type": "debug",
+        "z": "181d12fedac13429",
+        "name": "Raw Data",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 300,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "08b836d27a6e56d4",
+        "type": "debug",
+        "z": "181d12fedac13429",
+        "name": "Processed Data",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 540,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "2e755578a651a4a8",
+        "type": "function",
+        "z": "181d12fedac13429",
+        "name": "Format for Dashboard",
+        "func": "const heartRateMsg = {\n    payload: msg.payload.heartRate,\n    topic: \"heart_rate\"\n};\n\nconst zoneMsg = {\n    payload: msg.payload.zoneText,\n    topic: \"zone\",\n    zone: msg.payload.zone\n};\n\nconst ECG_WINDOW_SIZE = 128 * 5;\nlet ecgBuffer = flow.get('ecgBuffer') || [];\n\nif (msg.payload.samples && msg.payload.samples.length > 0) {\n    ecgBuffer = ecgBuffer.concat(msg.payload.samples);\n    if (ecgBuffer.length > ECG_WINDOW_SIZE) {\n        ecgBuffer = ecgBuffer.slice(ecgBuffer.length - ECG_WINDOW_SIZE);\n    }\n    flow.set('ecgBuffer', ecgBuffer);\n}\n\nconst ecgData = [];\nfor (let i = 0; i < ecgBuffer.length; i++) {\n    ecgData.push({ x: i, y: ecgBuffer[i] });\n}\n\nconst ecgChartMsg = {\n    payload: [\n        {\n            series: [\"ECG\"],\n            data: [ecgData],\n            labels: [\"\"]\n        }\n    ],\n    topic: \"ecg_chart\"\n};\n\nconst historyData = flow.get('heartRateHistory') || [];\n\nconst hrData = [];\n\nconst maxEntries = Math.min(historyData.length, 60);\n\nfor (let i = 0; i < maxEntries; i++) {\n    const entry = historyData[historyData.length - maxEntries + i];\n    hrData.push({\n        x: i,\n        y: entry.value\n    });\n}\n\nconst historyChartMsg = {\n    payload: [\n        {\n            series: [\"BPM\"],\n            data: [hrData],\n            labels: [\"\"]\n        }\n    ],\n    topic: \"hr_history\"\n};\n\nreturn [heartRateMsg, zoneMsg, ecgChartMsg, historyChartMsg];",
+        "outputs": 4,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 540,
+        "y": 120,
+        "wires": [
+            [
+                "0c74d4c11e0e2eb5"
+            ],
+            [
+                "5a86d1e089aaa1fb"
+            ],
+            [
+                "b07a7da617628c13"
+            ],
+            [
+                "15a7846201a94bd0"
+            ]
+        ]
+    },
+    {
+        "id": "0c74d4c11e0e2eb5",
+        "type": "ui_gauge",
+        "z": "181d12fedac13429",
+        "name": "Heart Rate",
+        "group": "ecg-dashboard",
+        "order": 1,
+        "width": "6",
+        "height": "4",
+        "gtype": "gage",
+        "title": "Heart Rate",
+        "label": "BPM",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "200",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "80",
+        "seg2": "120",
+        "className": "",
+        "x": 750,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "5a86d1e089aaa1fb",
+        "type": "ui_text",
+        "z": "181d12fedac13429",
+        "group": "ecg-dashboard",
+        "order": 2,
+        "width": "6",
+        "height": "2",
+        "name": "Zone",
+        "label": "Current Zone:",
+        "format": "{{msg.payload}}",
+        "layout": "row-left",
+        "className": "",
+        "x": 750,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "b07a7da617628c13",
+        "type": "ui_chart",
+        "z": "181d12fedac13429",
+        "name": "ECG Signal",
+        "group": "ecg-dashboard",
+        "order": 3,
+        "width": "12",
+        "height": "5",
+        "label": "ECG Signal",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "Waiting for ECG data...",
+        "dot": false,
+        "ymin": "",
+        "ymax": "",
+        "removeOlder": "20",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 750,
+        "y": 160,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "15a7846201a94bd0",
+        "type": "ui_chart",
+        "z": "181d12fedac13429",
+        "name": "Heart Rate History",
+        "group": "ecg-dashboard",
+        "order": 4,
+        "width": "12",
+        "height": "5",
+        "label": "Heart Rate History",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "Waiting for heart rate data...",
+        "dot": false,
+        "ymin": "40",
+        "ymax": "180",
+        "removeOlder": "20",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#2196F3",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 770,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "277b0e23dbc76201",
+        "type": "http in",
+        "z": "181d12fedac13429",
+        "name": "GET Heart Rate API",
+        "url": "/heartrate",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 260,
+        "wires": [
+            [
+                "c7a1e0c28e92c01a"
+            ]
+        ]
+    },
+    {
+        "id": "c7a1e0c28e92c01a",
+        "type": "function",
+        "z": "181d12fedac13429",
+        "name": "Get Latest Data",
+        "func": "const heartRateHistory = flow.get('heartRateHistory') || [];\nconst ecgBuffer = flow.get('ecgBuffer') || [];\nconst latestHeartRate = flow.get('latestHeartRate') || 0;\nconst latestZone = flow.get('latestZone') || 0;\n\nmsg.payload = {\n    timestamp: new Date().toISOString(),\n    heart_rate: latestHeartRate,\n    zone: latestZone,\n    zone_text: getZoneText(latestZone),\n    history: heartRateHistory,\n    ecg_samples: ecgBuffer\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json\",\n    \"Access-Control-Allow-Origin\": \"*\"\n};\n\nreturn msg;\n\nfunction getZoneText(zone) {\n    switch(zone) {\n        case 0: return 'Below Normal';\n        case 1: return 'Rest';\n        case 2: return 'Light Activity';\n        case 3: return 'Moderate Activity';\n        case 4: return 'Intense Activity';\n        case 5: return 'Maximum Effort';\n        default: return 'Unknown';\n    }\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 260,
+        "wires": [
+            [
+                "11130e805949cf9b"
+            ]
+        ]
+    },
+    {
+        "id": "11130e805949cf9b",
+        "type": "http response",
+        "z": "181d12fedac13429",
+        "name": "Send Response",
+        "statusCode": "200",
+        "headers": {},
+        "x": 520,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "48bb3e93abc75d21",
+        "type": "http in",
+        "z": "181d12fedac13429",
+        "name": "GET System Status",
+        "url": "/status",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 320,
+        "wires": [
+            [
+                "67a5c4d3efb12c42"
+            ]
+        ]
+    },
+    {
+        "id": "67a5c4d3efb12c42",
+        "type": "function",
+        "z": "181d12fedac13429",
+        "name": "Build Status Response",
+        "func": "const heartRateHistory = flow.get('heartRateHistory') || [];\nconst latestECGSamples = flow.get('latestECGSamples') || [];\nconst latestHeartRate = flow.get('latestHeartRate') || 0;\nconst latestZone = flow.get('latestZone') || 0;\n\n// Calculate uptime\nconst startTime = global.get('startTime') || Date.now();\nconst uptime = Math.floor((Date.now() - startTime) / 1000);\n\nmsg.payload = {\n    status: 'running',\n    uptime: uptime + 's',\n    timestamp: new Date().toISOString(),\n    data: {\n        heartRate: latestHeartRate,\n        zone: latestZone,\n        historyCount: heartRateHistory.length,\n        ecgSamplesCount: latestECGSamples.length\n    },\n    services: {\n        mqtt: 'connected',\n        nodeRed: 'running',\n        api: 'available'\n    }\n};\n\nmsg.headers = {\n    \"Content-Type\": \"application/json\",\n    \"Access-Control-Allow-Origin\": \"*\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "// Store startup time\nglobal.set('startTime', Date.now());",
+        "finalize": "",
+        "libs": [],
+        "x": 330,
+        "y": 320,
+        "wires": [
+            [
+                "5d82da1b47ea9c33"
+            ]
+        ]
+    },
+    {
+        "id": "5d82da1b47ea9c33",
+        "type": "http response",
+        "z": "181d12fedac13429",
+        "name": "Send Status Response",
+        "statusCode": "200",
+        "headers": {},
+        "x": 530,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "76c7f9bc32d8c907",
+        "type": "mqtt-broker",
+        "name": "Mosquitto",
+        "broker": "localhost",
+        "port": 1883,
+        "clientid": "node-red-smartwatch-client",
+        "autoConnect": true,
+        "usetls": false,
+        "compatmode": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ecg-dashboard",
+        "type": "ui_group",
+        "name": "ECG Monitoring",
+        "tab": "dashboard-tab",
+        "order": 1,
+        "disp": true,
+        "width": "12",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "dashboard-tab",
+        "type": "ui_tab",
+        "name": "Smartwatch ECG",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    }
+]

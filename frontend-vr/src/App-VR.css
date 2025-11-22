@@ -1,0 +1,294 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+.App-VR {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.vr-container {
+  width: 100%;
+  max-width: 1400px;
+  background: rgba(15, 20, 40, 0.8);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 10px 50px rgba(0, 212, 255, 0.3);
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+/* Header */
+.vr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+.vr-title {
+  font-size: 42px;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(90deg, #00d4ff, #0088ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+}
+
+.vr-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 25px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+.status-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4caf50;
+  box-shadow: 0 0 15px #4caf50;
+  animation: pulse 2s infinite;
+}
+
+.vr-status.disconnected .status-indicator {
+  background: #f44336;
+  box-shadow: 0 0 15px #f44336;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+/* View Selector */
+.view-selector {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  justify-content: center;
+}
+
+.view-btn {
+  padding: 18px 40px;
+  font-size: 20px;
+  font-weight: 600;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  background: rgba(0, 212, 255, 0.1);
+  color: #00d4ff;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.view-btn:hover {
+  background: rgba(0, 212, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.view-btn.active {
+  background: linear-gradient(135deg, #00d4ff, #0088ff);
+  color: #0a0e27;
+  border-color: #00d4ff;
+  box-shadow: 0 5px 25px rgba(0, 212, 255, 0.6);
+}
+
+/* Overview */
+.vr-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.vr-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+}
+
+.vr-card {
+  background: rgba(0, 212, 255, 0.05);
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.vr-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.1) 0%, transparent 70%);
+  animation: rotate 10s linear infinite;
+}
+
+@keyframes rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.vr-card.primary {
+  border-color: #00d4ff;
+  box-shadow: 0 5px 30px rgba(0, 212, 255, 0.4);
+  transform: scale(1.05);
+}
+
+.vr-card:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 10px 40px rgba(0, 212, 255, 0.5);
+}
+
+.card-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #00d4ff;
+  margin-bottom: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+
+.card-value {
+  font-size: 72px;
+  font-weight: 700;
+  margin: 15px 0;
+  text-shadow: 0 0 20px currentColor;
+  position: relative;
+  z-index: 1;
+}
+
+.card-unit {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+/* Zone Colors */
+.zone-0 { color: #808080; }
+.zone-1 { color: #4caf50; }
+.zone-2 { color: #8bc34a; }
+.zone-3 { color: #ffc107; }
+.zone-4 { color: #ff9800; }
+.zone-5 { color: #f44336; }
+
+/* Charts */
+.mini-chart,
+.vr-ecg-view,
+.vr-history-view {
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  border-radius: 20px;
+  padding: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.vr-chart-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #00d4ff;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.vr-chart-info {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 400;
+}
+
+.vr-canvas {
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Footer */
+.vr-footer {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid rgba(0, 212, 255, 0.3);
+}
+
+.footer-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-weight: 700;
+  font-size: 24px;
+  text-shadow: 0 0 10px currentColor;
+}
+
+/* Responsive adjustments for HoloLens */
+@media (max-width: 1920px) {
+  .vr-title {
+    font-size: 36px;
+  }
+  
+  .card-value {
+    font-size: 60px;
+  }
+}
+
+/* Optimize for hand gestures - larger touch targets */
+.view-btn,
+.vr-card {
+  min-height: 60px;
+}
+
+/* High contrast mode for better visibility in AR */
+@media (prefers-contrast: high) {
+  .vr-container {
+    border-width: 3px;
+    background: rgba(0, 0, 0, 0.9);
+  }
+  
+  .vr-card {
+    border-width: 3px;
+  }
+}
