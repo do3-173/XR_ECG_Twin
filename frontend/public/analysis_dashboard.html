@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECG Analysis Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="number"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn {
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .status-box.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+
+        .status-box.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .status-box.loading {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .plots-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 25px;
+            margin-top: 25px;
+        }
+
+        .plot-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .plot-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .plot-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .video-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .video-container h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .tab-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>ECG Analysis Dashboard</h1>
+                    <p class="subtitle">Advanced Signal Processing & Visualization</p>
+                </div>
+                <a href="/" style="text-decoration: none; color: #667eea; font-size: 1.1em; font-weight: 600;">← Back to Home</a>
+            </div>
+        </header>
+
+        <div class="control-panel">
+            <h2 style="color: #667eea; margin-bottom: 20px;">Analysis Configuration</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div class="form-group">
+                    <label for="samplingFreq">Sampling Frequency (Hz):</label>
+                    <input type="number" id="samplingFreq" value="128" min="50" max="1000">
+                </div>
+
+                <div class="form-group">
+                    <label for="waveletType">Wavelet Type:</label>
+                    <select id="waveletType">
+                        <option value="sym4" selected>sym4 (Recommended)</option>
+                        <option value="db4">db4</option>
+                        <option value="coif1">coif1</option>
+                        <option value="bior3.1">bior3.1</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="sampleDuration">ECG Sample Duration (seconds):</label>
+                    <select id="sampleDuration">
+                        <option value="5">5 seconds (640 samples)</option>
+                        <option value="10">10 seconds (1280 samples)</option>
+                        <option value="30" selected>30 seconds (3840 samples)</option>
+                        <option value="60">60 seconds (7680 samples)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="videoDuration">Video Duration (seconds):</label>
+                    <input type="number" id="videoDuration" value="30" min="5" max="60">
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="toggleContinuousMode()">
+                    <span id="continuousBtnText">Start Continuous</span>
+                </button>
+                <button class="btn btn-primary" onclick="generateVideo()">
+                    Generate Video
+                </button>
+                <button class="btn btn-secondary" onclick="clearResults()">
+                    Clear Results
+                </button>
+            </div>
+
+            <div id="statusBox" style="display: none;"></div>
+        </div>
+
+        <div class="tab-container">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('plots')">Plots</button>
+                <button class="tab" onclick="switchTab('metrics')">Metrics</button>
+                <button class="tab" onclick="switchTab('video')">Video</button>
+                <button class="tab" onclick="switchTab('data')">Raw Data</button>
+            </div>
+
+            <div id="plots-tab" class="tab-content active">
+                <div id="plotsContainer" class="plots-container"></div>
+            </div>
+
+            <div id="metrics-tab" class="tab-content">
+                <div id="metricsContainer"></div>
+            </div>
+
+            <div id="video-tab" class="tab-content">
+                <div id="videoContainer"></div>
+            </div>
+
+            <div id="data-tab" class="tab-content">
+                <pre id="rawDataContainer" style="background: #f8f9fa; padding: 20px; border-radius: 8px; overflow-x: auto;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+        let analysisResult = null;
+        let continuousMode = false;
+        let continuousTimer = null;
+        let lastUpdateTime = null;
+        const CONTINUOUS_INTERVAL = 5000; // 5 seconds, matching MATLAB
+
+        function showStatus(message, type = 'info') {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.style.display = 'block';
+            statusBox.className = `status-box ${type}`;
+            statusBox.innerHTML = message;
+        }
+
+        function hideStatus() {
+            document.getElementById('statusBox').style.display = 'none';
+        }
+
+        async function runAnalysis() {
+            const ecgSamplesText = document.getElementById('ecgSamples').value.trim();
+            const samplingFreq = parseFloat(document.getElementById('samplingFreq').value);
+            const waveletType = document.getElementById('waveletType').value;
+
+            if (!ecgSamplesText) {
+                showStatus('❌ Please enter ECG samples', 'error');
+                return;
+            }
+
+            let ecgSamples;
+            try {
+                ecgSamples = JSON.parse(ecgSamplesText);
+                if (!Array.isArray(ecgSamples)) {
+                    throw new Error('ECG samples must be an array');
+                }
+            } catch (e) {
+                showStatus(`❌ Invalid JSON format: ${e.message}`, 'error');
+                return;
+            }
+
+            showStatus('⏳ Processing ECG signal...', 'loading');
+            document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+
+            try {
+                // Step 1: Run analysis
+                const response = await fetch('http://localhost:8003/api/analysis/process/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ecg_samples: ecgSamples,
+                        sampling_frequency: samplingFreq,
+                        wavelet_type: waveletType,
+                        device_id: 'web_dashboard',
+                        participant_id: 1
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+
+                currentJobId = data.job_id;
+                analysisResult = data;
+
+                showStatus(`✅ Analysis completed in ${data.processing_time_ms}ms`, 'success');
+
+                // Step 2: Generate plots
+                await generatePlots(currentJobId);
+
+                // Display metrics
+                displayMetrics(data.result);
+
+                // Display raw data
+                document.getElementById('rawDataContainer').textContent = JSON.stringify(data, null, 2);
+
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+            }
+        }
+
+        async function generatePlots(jobId) {
+            try {
+                const response = await fetch('http://localhost:8003/api/analysis/plots/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ job_id: jobId })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Plot generation failed');
+                }
+
+                displayPlots(data.plots);
+
+            } catch (error) {
+                console.error('Plot generation error:', error);
+                showStatus(`⚠️ Analysis successful but plots failed: ${error.message}`, 'error');
+            }
+        }
+
+        function displayPlots(plots) {
+            const container = document.getElementById('plotsContainer');
+            container.innerHTML = '';
+
+            const plotTitles = {
+                'autocorr': 'Autocorrelation Function',
+                'wavelet_scales': 'Wavelet Decomposition Scales',
+                'wavelet_xcorr': 'Wavelet Cross-Correlation Matrix',
+                'wavelet_xcorr_sequences': 'Wavelet Cross-Correlation Sequences',
+                'graph': 'Graph Network Topology',
+                'graph_matlab': 'Graph Network Topology (MATLAB Style)'
+            };
+
+            for (const [key, base64Data] of Object.entries(plots)) {
+                const card = document.createElement('div');
+                card.className = 'plot-card';
+                card.innerHTML = `
+                    <h3>${plotTitles[key] || key}</h3>
+                    <img src="data:image/png;base64,${base64Data}" alt="${key}">
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function displayMetrics(result) {
+            const container = document.getElementById('metricsContainer');
+            container.innerHTML = '<h3 style="color: #667eea; margin-bottom: 20px;">Analysis Metrics</h3>';
+
+            const metrics = [
+                { label: 'Periodicity Strength', value: result.autocorr_periodicity_strength?.toFixed(3), color: '#667eea' },
+                { label: 'First Peak Lag', value: result.autocorr_first_peak_lag + ' samples', color: '#764ba2' },
+                { label: 'Decay Rate', value: result.autocorr_decay_rate?.toExponential(2), color: '#f093fb' },
+                { label: 'Wavelet Energy', value: result.wavelet_total_energy?.toFixed(2), color: '#4facfe' },
+                { label: 'Energy Entropy', value: result.wavelet_energy_entropy?.toFixed(3), color: '#00f2fe' },
+                { label: 'Graph Nodes', value: result.graph_n_nodes, color: '#43e97b' },
+                { label: 'Graph Density', value: result.graph_density?.toFixed(3), color: '#38f9d7' },
+                { label: 'Graph Clustering', value: result.graph_avg_clustering?.toFixed(3), color: '#fa709a' }
+            ];
+
+            const grid = document.createElement('div');
+            grid.className = 'metrics-grid';
+
+            metrics.forEach(metric => {
+                if (metric.value !== undefined && metric.value !== null) {
+                    const card = document.createElement('div');
+                    card.className = 'metric-card';
+                    card.style.background = `linear-gradient(135deg, ${metric.color} 0%, ${metric.color}dd 100%)`;
+                    card.innerHTML = `
+                        <div class="metric-label">${metric.label}</div>
+                        <div class="metric-value">${metric.value}</div>
+                    `;
+                    grid.appendChild(card);
+                }
+            });
+
+            container.appendChild(grid);
+        }
+
+        async function generateVideo() {
+            const ecgSamplesText = document.getElementById('ecgSamples').value.trim();
+            const samplingFreq = parseFloat(document.getElementById('samplingFreq').value);
+            const duration = parseInt(document.getElementById('videoDuration').value);
+
+            if (!ecgSamplesText) {
+                showStatus('❌ Please enter ECG samples first', 'error');
+                return;
+            }
+
+            let ecgSamples;
+            try {
+                ecgSamples = JSON.parse(ecgSamplesText);
+            } catch (e) {
+                showStatus(`❌ Invalid JSON format: ${e.message}`, 'error');
+                return;
+            }
+
+            showStatus('🎬 Generating video... This may take a minute', 'loading');
+            document.querySelectorAll('.btn').forEach(btn => btn.disabled = true);
+
+            try {
+                const response = await fetch('http://localhost:8003/api/analysis/video/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ecg_samples: ecgSamples,
+                        sampling_frequency: samplingFreq,
+                        duration_seconds: duration
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Video generation failed');
+                }
+
+                showStatus('✅ Video generated successfully!', 'success');
+
+                const videoContainer = document.getElementById('videoContainer');
+                videoContainer.innerHTML = `
+                    <h3>Real-time ECG Monitoring Video</h3>
+                    <p style="color: #666; margin: 10px 0;">Duration: ${data.duration_seconds}s | FPS: ${data.fps}</p>
+                    <video controls autoplay>
+                        <source src="http://localhost:8003${data.video_url}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <p style="margin-top: 15px;">
+                        <a href="http://localhost:8003${data.video_url}" download class="btn btn-secondary">
+                            ⬇️ Download Video
+                        </a>
+                    </p>
+                `;
+
+                switchTab('video');
+
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+            }
+        }
+
+        async function fetchLiveECGData() {
+            // Fetch real-time ECG data from the API endpoint
+            try {
+                const response = await fetch('http://localhost:8000/api/heartrate');
+                const data = await response.json();
+                
+                if (data.ecg_samples && Array.isArray(data.ecg_samples)) {
+                    return {
+                        samples: data.ecg_samples,
+                        heartRate: data.heart_rate,
+                        timestamp: new Date().toISOString()
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error('Failed to fetch live ECG data:', error);
+                return null;
+            }
+        }
+
+        function generateSyntheticECG(duration) {
+            // Generate synthetic ECG data for demo
+            const fs = 128;
+            const samples = duration * fs;
+            const ecg = [];
+
+            for (let i = 0; i < samples; i++) {
+                const t = i / fs;
+                const hr_freq = 70 / 60; // 70 BPM
+                
+                // QRS complex
+                const qrs = 0.8 * Math.sin(2 * Math.PI * hr_freq * t);
+                // P wave
+                const p_wave = 0.2 * Math.sin(2 * Math.PI * hr_freq * t - 0.5);
+                // T wave
+                const t_wave = 0.3 * Math.sin(2 * Math.PI * hr_freq * t + 0.8);
+                // Noise
+                const noise = (Math.random() - 0.5) * 0.05;
+                
+                ecg.push(qrs + p_wave + t_wave + noise);
+            }
+
+            return ecg;
+        }
+
+        function loadSampleData() {
+            const duration = parseInt(document.getElementById('sampleDuration').value);
+            const ecg = generateSyntheticECG(duration);
+            document.getElementById('ecgSamples').value = JSON.stringify(ecg);
+            showStatus(`✅ Sample ECG data loaded (${duration} seconds, ${ecg.length} samples, 70 BPM)`, 'success');
+        }
+
+        async function toggleContinuousMode() {
+            continuousMode = !continuousMode;
+            const btnText = document.getElementById('continuousBtnText');
+            
+            if (continuousMode) {
+                btnText.textContent = 'Stop Continuous';
+                showStatus('🔄 Continuous mode started - Auto-refreshing every 5 seconds', 'loading');
+                
+                // Start continuous updates
+                await runContinuousAnalysis();
+                continuousTimer = setInterval(runContinuousAnalysis, CONTINUOUS_INTERVAL);
+            } else {
+                btnText.textContent = 'Start Continuous';
+                if (continuousTimer) {
+                    clearInterval(continuousTimer);
+                    continuousTimer = null;
+                }
+                showStatus('⏸️ Continuous mode stopped', 'info');
+            }
+        }
+
+        async function runContinuousAnalysis() {
+            try {
+                // Try to fetch live data first, fall back to synthetic
+                let ecgData = await fetchLiveECGData();
+                
+                if (!ecgData) {
+                    // Generate synthetic data as fallback
+                    const duration = parseInt(document.getElementById('sampleDuration').value);
+                    ecgData = {
+                        samples: generateSyntheticECG(duration),
+                        heartRate: 70 + Math.random() * 20 - 10, // Random HR 60-80
+                        timestamp: new Date().toISOString()
+                    };
+                }
+
+                const samplingFreq = parseFloat(document.getElementById('samplingFreq').value);
+                const waveletType = document.getElementById('waveletType').value;
+
+                // Run analysis without showing loading status (silent update)
+                const response = await fetch('http://localhost:8003/api/analysis/process/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ecg_samples: ecgData.samples,
+                        sampling_frequency: samplingFreq,
+                        wavelet_type: waveletType,
+                        device_id: 'web_dashboard_continuous',
+                        participant_id: 1
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentJobId = data.job_id;
+                    analysisResult = data;
+                    lastUpdateTime = new Date();
+
+                    // Update status with timestamp
+                    const timeStr = lastUpdateTime.toLocaleTimeString();
+                    showStatus(`🔄 Auto-updated at ${timeStr} (HR: ${ecgData.heartRate.toFixed(0)} bpm, ${data.processing_time_ms}ms)`, 'success');
+
+                    // Generate and display plots
+                    await generatePlots(currentJobId);
+
+                    // Update metrics
+                    displayMetrics(data.result);
+
+                    // Update raw data
+                    document.getElementById('rawDataContainer').textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                console.error('Continuous analysis error:', error);
+                if (continuousMode) {
+                    showStatus(`⚠️ Update failed: ${error.message} - Retrying in 5s...`, 'error');
+                }
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('plotsContainer').innerHTML = '';
+            document.getElementById('metricsContainer').innerHTML = '';
+            document.getElementById('videoContainer').innerHTML = '';
+            document.getElementById('rawDataContainer').textContent = '';
+            currentJobId = null;
+            analysisResult = null;
+            
+            // Stop continuous mode if running
+            if (continuousMode) {
+                toggleContinuousMode();
+            }
+            
+            hideStatus();
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (continuousTimer) {
+                clearInterval(continuousTimer);
+            }
+        });
+
+        // Load sample data on page load for demo
+        window.addEventListener('load', () => {
+            console.log('ECG Analysis Dashboard loaded');
+            console.log('API endpoints:');
+            console.log('- Analysis: http://localhost:8003/api/analysis/process/');
+            console.log('- Plots: http://localhost:8003/api/analysis/plots/');
+            console.log('- Video: http://localhost:8003/api/analysis/video/');
+            console.log('- Live ECG: http://localhost:8000/api/heartrate');
+        });
+    </script>
+</body>
+</html>

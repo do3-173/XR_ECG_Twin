@@ -18,6 +18,7 @@ graph TB
     subgraph Services["Microservices"]
         ECG["ECG Service<br/>Django<br/>Port 8001<br/>R-peak Detection<br/>Zone Classification"]
         IOT["IoT Service<br/>Django<br/>Port 8002<br/>MQTT Subscriber<br/>Data Persistence"]
+        ANL["Analysis Service<br/>Django<br/>Port 8003<br/>Signal Processing<br/>Wavelet + Graph Features"]
     end
 
     subgraph DataLayer["Data & Messaging"]
@@ -35,12 +36,15 @@ graph TB
     FV -->|HTTP REST| GW
     GW -->|Proxy| ECG
     GW -->|Proxy| IOT
+    GW -->|Proxy| ANL
     GW -->|Poll| NR
     ECG -->|Read/Write| PG
     IOT -->|Write| PG
+    ANL -->|Read/Write| PG
     IOT -->|Subscribe| MQ
     ECG -->|Cache| RD
     IOT -->|Cache| RD
+    ANL -->|Cache| RD
     SIM -->|Publish<br/>smartwatch/data| MQ
     MQ -->|Stream| NR
 
@@ -49,6 +53,7 @@ graph TB
     style GW fill:#FF9800,stroke:#F57C00,color:#fff
     style ECG fill:#2196F3,stroke:#1976D2,color:#fff
     style IOT fill:#9C27B0,stroke:#7B1FA2,color:#fff
+    style ANL fill:#FFC107,stroke:#FFA000,color:#fff
     style PG fill:#607D8B,stroke:#455A64,color:#fff
     style RD fill:#F44336,stroke:#D32F2F,color:#fff
     style MQ fill:#795548,stroke:#5D4037,color:#fff
@@ -347,6 +352,36 @@ docker-compose down
 - `GET /api/devices/` - List registered devices
 - `GET /api/sensor-data/` - Query stored sensor data
 
+### Analysis Service (Port 8003)
+- Django REST service for advanced ECG signal processing
+- Implements MATLAB-translated algorithms (Python)
+- Multi-scale wavelet decomposition (SWT ~ MODWT)
+- Graph-theoretic feature extraction
+- Job-based processing with UUID tracking
+
+**Features:**
+- **Autocorrelation Analysis:** Periodicity detection, decay rate, first min/peak lag
+- **Wavelet Features:** Energy distribution, entropy, cross-correlation matrix (6x6)
+- **Graph Features:** Network topology metrics (density, clustering, centrality)
+
+**Algorithms:**
+- Signal autocorrelation (FFT-based, O(N log N))
+- Stationary Wavelet Transform (sym4, db4 wavelets)
+- Adjacency matrix construction with thresholding
+- NetworkX graph analysis
+
+**Endpoints:**
+- `POST /api/analysis/process/` - Analyze ECG signal (128-100000 samples)
+- `GET /api/analysis/result/<job_id>/` - Get analysis result by job ID
+- `GET /api/analysis/latest/` - Get latest result (filter by device/participant)
+- `GET /api/analysis/jobs/` - List all analysis jobs
+- `GET /api/analysis/health/` - Service health check
+
+**Performance:**
+- Excellent: < 2 seconds for 5000 samples (~39s ECG)
+- Typical: 2-35 ms for 2000 samples
+- Redis caching (3600s TTL) for repeated queries
+
 ## Development
 
 ### Local Development (Without Docker)
@@ -381,7 +416,18 @@ python manage.py migrate
 python manage.py runserver 8002
 ```
 
-#### 4. Start Supporting Services
+#### 4. Setup Analysis Service
+```bash
+cd services/ecg_analysis_service
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py makemigrations
+python manage.py migrate
+python manage.py runserver 8003
+```
+
+#### 5. Start Supporting Services
 ```bash
 # PostgreSQL
 docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=ecg_password timescale/timescaledb:latest-pg15
@@ -554,7 +600,7 @@ MIT License
 
 ```
 XR_ECG_Twin/
-├── docker-compose.yml          # Orchestrates 10 services
+├── docker-compose.yml          # Orchestrates 11 services
 ├── .dockerignore               # Excludes files from Docker build
 ├── README.md                   # This file
 ├── private_folder/             # Documentation and session notes
@@ -658,14 +704,17 @@ XR_ECG_Twin/
 6. **Gateway** (Port 8000) - API aggregation
 7. **ECG Service** (Port 8001) - ECG processing
 8. **IoT Service** (Port 8002) - MQTT persistence (140+ records)
-9. **Frontend Classic** (Port 3001) - Web interface with enhanced features
-10. **Frontend VR** (Port 3002) - HoloLens-optimized interface
+9. **Analysis Service** (Port 8003) - Signal processing (autocorr, wavelet, graph)
+10. **Frontend Classic** (Port 3001) - Web interface with enhanced features
+11. **Frontend VR** (Port 3002) - HoloLens-optimized interface
 
 **Features Implemented:**
 - Real-time ECG visualization with canvas rendering
 - Interactive heart rate history (clickable points, tooltips)
 - Zone-colored backgrounds (6 heart rate zones)
 - MQTT data persistence to PostgreSQL
+- Advanced ECG analysis (autocorrelation, wavelet decomposition, graph features)
+- MATLAB algorithm translation to Python (signal processing)
 - Dual frontend architecture (Classic + VR)
 - HoloLens optimization (dark theme, gesture-friendly UI)
 - Configurable simulator (environment variables)

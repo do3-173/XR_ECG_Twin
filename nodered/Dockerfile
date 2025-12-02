@@ -1,13 +1,27 @@
 FROM nodered/node-red:latest
 
-# Install Node-RED Dashboard
-RUN npm install node-red-dashboard
+# Switch to root to install packages
+USER root
 
-# Copy flows
-COPY flows.json /data/flows.json
-COPY settings.js /data/settings.js
+# Create necessary directories and set permissions
+RUN mkdir -p /data/.npm && \
+    chown -R node-red:node-red /data
+
+# Switch back to node-red user
+USER node-red
+
+# Set working directory
+WORKDIR /usr/src/node-red
+
+# Install Node-RED Dashboard using the node-red user
+RUN npm install --prefix /data node-red-dashboard
+
+# Copy flows and settings
+COPY --chown=node-red:node-red flows.json /data/flows.json
+COPY --chown=node-red:node-red settings.js /data/settings.js
 
 # Expose Node-RED port
 EXPOSE 1880
 
-CMD ["npm", "start", "--cache", "/data/.npm", "--", "--userDir", "/data"]
+# Start Node-RED with proper user directory
+CMD ["node-red", "--userDir", "/data"]

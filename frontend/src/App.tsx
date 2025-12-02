@@ -381,8 +381,30 @@ function App() {
     <div className="App">
       <div className="container">
         <header>
-          <h1>ECG Monitoring System</h1>
-          <p>Real-time cardiac monitoring with smartwatch data</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1>ECG Monitoring System</h1>
+              <p>Real-time cardiac monitoring with smartwatch data</p>
+            </div>
+            <a 
+              href="/analysis_dashboard.html" 
+              style={{
+                padding: '12px 24px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '1.1em',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              📊 Analysis Dashboard
+            </a>
+          </div>
         </header>
 
         <div className={`simulator-status ${isConnected ? 'status-connected' : 'status-disconnected'}`}>

@@ -181,6 +181,33 @@ services:
       - ecg_network
     command: python manage.py runserver 0.0.0.0:8002
 
+  # ECG Analysis Service (MATLAB Translation)
+  analysis-service:
+    build:
+      context: ./services/ecg_analysis_service
+      dockerfile: Dockerfile
+    container_name: ecg_analysis_service
+    ports:
+      - "8003:8003"
+    environment:
+      - POSTGRES_DB=ecg_db
+      - POSTGRES_USER=ecg_user
+      - POSTGRES_PASSWORD=ecg_password
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/ecg_analysis_service:/app
+    networks:
+      - ecg_network
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8003"
+
   # Frontend (React)
   frontend:
     build:
