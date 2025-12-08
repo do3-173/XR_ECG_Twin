@@ -183,11 +183,16 @@ function App() {
       });
 
       const data = await response.json();
-      if (response.ok) {
-        setAnalysisPlots(data.plots);
+      if (response.ok && data.plots) {
+        // Only update if we have valid plots - preserve previous otherwise
+        setAnalysisPlots(prev => ({
+          ...prev,  // Keep previous plots as fallback
+          ...data.plots  // Overwrite with new plots
+        }));
       }
     } catch (error) {
       console.error('Plot fetch error:', error);
+      // Don't clear plots on error - keep showing previous ones
     }
   };
 
@@ -374,6 +379,20 @@ function App() {
     setExpandedPlot(null);
   };
 
+  const savePlot = (plotKey: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent expanding when clicking save
+    const base64Data = analysisPlots[plotKey];
+    if (!base64Data) return;
+
+    const link = document.createElement('a');
+    link.href = `data:image/png;base64,${base64Data}`;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.download = `${plotKey}_${timestamp}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="App-VR">
       <div className="vr-container">
@@ -507,7 +526,12 @@ function App() {
 
             <div className="analysis-grid">
               <div className="analysis-card" onClick={() => handlePlotClick('wavelet_scales')}>
-                <h3>Wavelet Decomposition</h3>
+                <div className="card-header">
+                  <h3>Wavelet Decomposition</h3>
+                  {analysisPlots.wavelet_scales && (
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_scales', e)}>💾 Save</button>
+                  )}
+                </div>
                 <div className="analysis-content">
                   {analysisPlots.wavelet_scales ? (
                     <img src={`data:image/png;base64,${analysisPlots.wavelet_scales}`} alt="Wavelet Scales" />
@@ -518,7 +542,12 @@ function App() {
               </div>
 
               <div className="analysis-card" onClick={() => handlePlotClick('wavelet_xcorr')}>
-                <h3>Cross-Correlation Matrix</h3>
+                <div className="card-header">
+                  <h3>Cross-Correlation Matrix</h3>
+                  {analysisPlots.wavelet_xcorr && (
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr', e)}>💾 Save</button>
+                  )}
+                </div>
                 <div className="analysis-content">
                   {analysisPlots.wavelet_xcorr ? (
                     <img src={`data:image/png;base64,${analysisPlots.wavelet_xcorr}`} alt="Correlation Matrix" />
@@ -529,7 +558,12 @@ function App() {
               </div>
 
               <div className="analysis-card" onClick={() => handlePlotClick('wavelet_xcorr_sequences')}>
-                <h3>Cross-Correlation Sequences</h3>
+                <div className="card-header">
+                  <h3>Cross-Correlation Sequences</h3>
+                  {analysisPlots.wavelet_xcorr_sequences && (
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr_sequences', e)}>💾 Save</button>
+                  )}
+                </div>
                 <div className="analysis-content">
                   {analysisPlots.wavelet_xcorr_sequences ? (
                     <img src={`data:image/png;base64,${analysisPlots.wavelet_xcorr_sequences}`} alt="Correlation Sequences" />
@@ -540,7 +574,12 @@ function App() {
               </div>
 
               <div className="analysis-card" onClick={() => handlePlotClick('graph_matlab')}>
-                <h3>Network Topology (MATLAB)</h3>
+                <div className="card-header">
+                  <h3>Network Topology (MATLAB)</h3>
+                  {analysisPlots.graph_matlab && (
+                    <button className="save-btn" onClick={(e) => savePlot('graph_matlab', e)}>💾 Save</button>
+                  )}
+                </div>
                 <div className="analysis-content">
                   {analysisPlots.graph_matlab ? (
                     <img src={`data:image/png;base64,${analysisPlots.graph_matlab}`} alt="Graph Topology" />

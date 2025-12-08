@@ -422,12 +422,36 @@ body {
 
 .analysis-card h3 {
   color: #00d4ff;
-  margin: 0 0 15px 0;
+  margin: 0;
   font-size: 18px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   border-bottom: 1px solid rgba(0, 212, 255, 0.1);
   padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.save-btn {
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(0, 212, 255, 0.2);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: #00d4ff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-btn:hover {
+  background: rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
 }
 
 .analysis-content {
