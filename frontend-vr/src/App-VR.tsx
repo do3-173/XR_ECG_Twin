@@ -10,6 +10,20 @@ interface HeartRateData {
   ecg_samples: number[];
 }
 
+interface AnalysisResult {
+  job_id: string;
+  result: any;
+  processing_time_ms: number;
+}
+
+interface AnalysisPlots {
+  wavelet_scales?: string;
+  wavelet_xcorr?: string;
+  wavelet_xcorr_sequences?: string;
+  graph_matlab?: string;
+  [key: string]: string | undefined;
+}
+
 function App() {
   const [heartRate, setHeartRate] = useState<number>(0);
   const [zone, setZone] = useState<number>(1);
@@ -18,13 +32,24 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
   const [ecgData, setEcgData] = useState<number[]>([]);
   const [history, setHistory] = useState<Array<{ time: number; value: number; zone: number }>>([]);
-  const [selectedView, setSelectedView] = useState<'overview' | 'ecg' | 'history'>('overview');
-  
+  const [selectedView, setSelectedView] = useState<'overview' | 'ecg' | 'history' | 'analysis'>('overview');
+
+  // Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [runContinuousAnalysis, setRunContinuousAnalysis] = useState<boolean>(false);
+  const [analysisStatus, setAnalysisStatus] = useState<string>('Ready');
+  const [analysisPlots, setAnalysisPlots] = useState<AnalysisPlots>({});
+
+  // Expanded View State
+  const [expandedPlot, setExpandedPlot] = useState<string | null>(null);
+
   const ecgCanvasRef = useRef<HTMLCanvasElement>(null);
   const historyCanvasRef = useRef<HTMLCanvasElement>(null);
   const startTimeRef = useRef<Date>(new Date());
+  const analysisTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const API_URL = '/api/heartrate/';
+  const ANALYSIS_API_URL = 'http://localhost:8003/api/analysis';
   const MAX_ECG_POINTS = 128 * 5;
 
   useEffect(() => {
@@ -32,7 +57,7 @@ function App() {
       try {
         const response = await fetch(API_URL);
         const data: HeartRateData = await response.json();
-        
+
         setIsConnected(true);
         setHeartRate(data.heart_rate);
         setZone(data.zone);
@@ -67,12 +92,104 @@ function App() {
   }, []);
 
   useEffect(() => {
-    drawECG();
-  }, [ecgData]);
+    if (selectedView === 'ecg') {
+      drawECG();
+    }
+  }, [ecgData, selectedView]);
 
   useEffect(() => {
-    drawHistory();
-  }, [history]);
+    if (selectedView === 'history') {
+      drawHistory();
+    }
+  }, [history, selectedView]);
+
+  // Continuous Analysis Effect
+  useEffect(() => {
+    if (runContinuousAnalysis) {
+      if (!analysisTimerRef.current) {
+        triggerAnalysis(); // Run immediately
+        analysisTimerRef.current = setInterval(triggerAnalysis, 5000);
+      }
+    } else {
+      if (analysisTimerRef.current) {
+        clearInterval(analysisTimerRef.current);
+        analysisTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (analysisTimerRef.current) {
+        clearInterval(analysisTimerRef.current);
+      }
+    };
+  }, [runContinuousAnalysis]);
+
+  const triggerAnalysis = async () => {
+    if (isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    setAnalysisStatus('Fetching ECG data...');
+
+    try {
+      // Fetch fresh ECG data directly from API (exactly like analysis_dashboard.html does)
+      const ecgResponse = await fetch('http://localhost:8000/api/heartrate');
+      const ecgApiData = await ecgResponse.json();
+
+      if (!ecgApiData.ecg_samples || !Array.isArray(ecgApiData.ecg_samples)) {
+        setAnalysisStatus('No ECG data available from API');
+        setIsAnalyzing(false);
+        return;
+      }
+
+      setAnalysisStatus('Processing...');
+
+      // Run analysis with fresh data
+      const response = await fetch(`${ANALYSIS_API_URL}/process/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ecg_samples: ecgApiData.ecg_samples,
+          sampling_frequency: 128,
+          wavelet_type: 'sym4',
+          device_id: 'hololens_vr_dashboard',
+          participant_id: 1
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Analysis failed');
+
+      const timeStr = new Date().toLocaleTimeString();
+      const hr = ecgApiData.heart_rate || 0;
+      setAnalysisStatus(`Updated at ${timeStr} (HR: ${hr} bpm, ${data.processing_time_ms}ms)`);
+
+      // Fetch plots
+      await fetchPlots(data.job_id);
+
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      setAnalysisStatus(`Error: ${error.message}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const fetchPlots = async (jobId: string) => {
+    try {
+      const response = await fetch(`${ANALYSIS_API_URL}/plots/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setAnalysisPlots(data.plots);
+      }
+    } catch (error) {
+      console.error('Plot fetch error:', error);
+    }
+  };
 
   const drawECG = () => {
     const canvas = ecgCanvasRef.current;
@@ -96,7 +213,7 @@ function App() {
     // Draw grid for depth
     ctx.strokeStyle = 'rgba(100, 200, 255, 0.2)';
     ctx.lineWidth = 1;
-    
+
     for (let i = 0; i <= 10; i++) {
       const x = (i / 10) * w;
       ctx.beginPath();
@@ -104,7 +221,7 @@ function App() {
       ctx.lineTo(x, h);
       ctx.stroke();
     }
-    
+
     for (let i = 0; i <= 5; i++) {
       const y = (i / 5) * h;
       ctx.beginPath();
@@ -117,7 +234,7 @@ function App() {
     const gradient = ctx.createLinearGradient(0, 0, 0, h);
     gradient.addColorStop(0, '#00d4ff');
     gradient.addColorStop(1, '#0088ff');
-    
+
     ctx.shadowColor = '#00d4ff';
     ctx.shadowBlur = 15;
     ctx.strokeStyle = gradient;
@@ -192,7 +309,7 @@ function App() {
 
     history.forEach((point, i) => {
       const x = padding + (i / Math.max(1, history.length - 1)) * chartW;
-      const y = Math.max(padding, Math.min(h - padding, 
+      const y = Math.max(padding, Math.min(h - padding,
         h - padding - ((point.value - minHR) / hrRange) * chartH));
 
       if (i === 0) {
@@ -209,9 +326,9 @@ function App() {
     // Draw data points
     history.forEach((point, i) => {
       const x = padding + (i / Math.max(1, history.length - 1)) * chartW;
-      const y = Math.max(padding, Math.min(h - padding, 
+      const y = Math.max(padding, Math.min(h - padding,
         h - padding - ((point.value - minHR) / hrRange) * chartH));
-      
+
       ctx.fillStyle = '#00d4ff';
       ctx.shadowColor = '#00d4ff';
       ctx.shadowBlur = 10;
@@ -227,7 +344,7 @@ function App() {
     ctx.font = 'bold 20px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('Time (seconds)', w / 2, h - 20);
-    
+
     ctx.save();
     ctx.translate(30, h / 2);
     ctx.rotate(-Math.PI / 2);
@@ -247,6 +364,16 @@ function App() {
     }
   };
 
+  const handlePlotClick = (plotKey: string) => {
+    if (analysisPlots[plotKey]) {
+      setExpandedPlot(plotKey);
+    }
+  };
+
+  const closeExpandedView = () => {
+    setExpandedPlot(null);
+  };
+
   return (
     <div className="App-VR">
       <div className="vr-container">
@@ -261,23 +388,29 @@ function App() {
 
         {/* Main view selector */}
         <div className="view-selector">
-          <button 
+          <button
             className={`view-btn ${selectedView === 'overview' ? 'active' : ''}`}
             onClick={() => setSelectedView('overview')}
           >
             Overview
           </button>
-          <button 
+          <button
             className={`view-btn ${selectedView === 'ecg' ? 'active' : ''}`}
             onClick={() => setSelectedView('ecg')}
           >
             ECG Signal
           </button>
-          <button 
+          <button
             className={`view-btn ${selectedView === 'history' ? 'active' : ''}`}
             onClick={() => setSelectedView('history')}
           >
             History
+          </button>
+          <button
+            className={`view-btn ${selectedView === 'analysis' ? 'active' : ''}`}
+            onClick={() => setSelectedView('analysis')}
+          >
+            Analysis
           </button>
         </div>
 
@@ -290,13 +423,13 @@ function App() {
                 <div className={`card-value zone-${zone}`}>{heartRate || '--'}</div>
                 <div className="card-unit">BPM</div>
               </div>
-              
+
               <div className="vr-card">
                 <div className="card-label">ZONE</div>
                 <div className={`card-value zone-${zone}`}>{zoneText}</div>
                 <div className="card-unit">{getZoneDescription(zone)}</div>
               </div>
-              
+
               <div className="vr-card">
                 <div className="card-label">MONITOR TIME</div>
                 <div className="card-value">{elapsedTime}</div>
@@ -305,8 +438,8 @@ function App() {
             </div>
 
             <div className="mini-chart">
-              <canvas 
-                ref={ecgCanvasRef} 
+              <canvas
+                ref={ecgCanvasRef}
                 width={800}
                 height={250}
               />
@@ -321,8 +454,8 @@ function App() {
               ECG Signal - Real-time
               <span className="vr-chart-info">{heartRate} BPM</span>
             </div>
-            <canvas 
-              ref={ecgCanvasRef} 
+            <canvas
+              ref={ecgCanvasRef}
               className="vr-canvas"
               width={1000}
               height={500}
@@ -337,12 +470,110 @@ function App() {
               Heart Rate History
               <span className="vr-chart-info">{history.length} data points</span>
             </div>
-            <canvas 
+            <canvas
               ref={historyCanvasRef}
               className="vr-canvas"
               width={1000}
               height={500}
             />
+          </div>
+        )}
+
+        {/* Analysis View (New) */}
+        {selectedView === 'analysis' && (
+          <div className="vr-analysis-view">
+            <div className="analysis-controls">
+              <button
+                className={`control-btn ${runContinuousAnalysis ? 'stop' : 'primary'}`}
+                onClick={() => setRunContinuousAnalysis(!runContinuousAnalysis)}
+              >
+                {runContinuousAnalysis ? '⏹ Stop Analysis' : '▶ Start Continuous Analysis'}
+              </button>
+
+              <div className="analysis-status">
+                Status: {analysisStatus}
+              </div>
+
+              {!runContinuousAnalysis && (
+                <button
+                  className="control-btn secondary"
+                  onClick={triggerAnalysis}
+                  disabled={isAnalyzing}
+                >
+                  Create Single Snapshot
+                </button>
+              )}
+            </div>
+
+            <div className="analysis-grid">
+              <div className="analysis-card" onClick={() => handlePlotClick('wavelet_scales')}>
+                <h3>Wavelet Decomposition</h3>
+                <div className="analysis-content">
+                  {analysisPlots.wavelet_scales ? (
+                    <img src={`data:image/png;base64,${analysisPlots.wavelet_scales}`} alt="Wavelet Scales" />
+                  ) : (
+                    <div className="placeholder">No Data</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="analysis-card" onClick={() => handlePlotClick('wavelet_xcorr')}>
+                <h3>Cross-Correlation Matrix</h3>
+                <div className="analysis-content">
+                  {analysisPlots.wavelet_xcorr ? (
+                    <img src={`data:image/png;base64,${analysisPlots.wavelet_xcorr}`} alt="Correlation Matrix" />
+                  ) : (
+                    <div className="placeholder">No Data</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="analysis-card" onClick={() => handlePlotClick('wavelet_xcorr_sequences')}>
+                <h3>Cross-Correlation Sequences</h3>
+                <div className="analysis-content">
+                  {analysisPlots.wavelet_xcorr_sequences ? (
+                    <img src={`data:image/png;base64,${analysisPlots.wavelet_xcorr_sequences}`} alt="Correlation Sequences" />
+                  ) : (
+                    <div className="placeholder">No Data</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="analysis-card" onClick={() => handlePlotClick('graph_matlab')}>
+                <h3>Network Topology (MATLAB)</h3>
+                <div className="analysis-content">
+                  {analysisPlots.graph_matlab ? (
+                    <img src={`data:image/png;base64,${analysisPlots.graph_matlab}`} alt="Graph Topology" />
+                  ) : (
+                    <div className="placeholder">No Data</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Expanded View Modal */}
+        {expandedPlot && analysisPlots[expandedPlot] && (
+          <div className="expanded-overlay" onClick={closeExpandedView}>
+            <div className="expanded-content" onClick={(e) => e.stopPropagation()}>
+              <h2 className="expanded-title">
+                {expandedPlot === 'wavelet_scales' && 'Wavelet Decomposition'}
+                {expandedPlot === 'wavelet_xcorr' && 'Cross-Correlation Matrix'}
+                {expandedPlot === 'wavelet_xcorr_sequences' && 'Cross-Correlation Sequences'}
+                {expandedPlot === 'graph_matlab' && 'Network Topology (MATLAB)'}
+              </h2>
+              <div className="expanded-image-container">
+                <img
+                  src={`data:image/png;base64,${analysisPlots[expandedPlot]}`}
+                  className="expanded-image"
+                  alt="Expanded Plot"
+                />
+              </div>
+              <button className="close-expanded-btn" onClick={closeExpandedView}>
+                Close View
+              </button>
+            </div>
           </div>
         )}
 
