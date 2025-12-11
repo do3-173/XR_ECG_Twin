@@ -110,13 +110,24 @@ export const PointCloudHeart: React.FC = () => {
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // OrbitControls - Enable mouse controls
+    // OrbitControls - Enable mouse controls with better responsiveness
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.25; // Smooth and responsive
     controls.enableZoom = true;
+    controls.zoomSpeed = 1.5; // Fast mouse wheel zoom
     controls.enableRotate = true;
+    controls.rotateSpeed = 1.0;
     controls.enablePan = true;
+    controls.panSpeed = 1.0;
+    controls.minDistance = 2; // Allow closer zoom
+    controls.maxDistance = 100; // Allow farther zoom
+    controls.screenSpacePanning = false; // Pan in world space
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN
+    };
     controlsRef.current = controls;
 
     // Create point cloud geometry
@@ -438,11 +449,15 @@ export const PointCloudHeart: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
-                      const distance = camera.position.length();
-                      const newDistance = distance - 2;  // No limit
-                      camera.position.normalize().multiplyScalar(newDistance);
+                      const controls = controlsRef.current;
+                      const direction = new THREE.Vector3();
+                      direction.subVectors(camera.position, controls.target).normalize();
+                      const currentDistance = camera.position.distanceTo(controls.target);
+                      const newDistance = Math.max(controls.minDistance, currentDistance - 1.5);
+                      camera.position.copy(controls.target).addScaledVector(direction, newDistance);
+                      controls.update();
                     }
                   }}
                   style={{
@@ -460,11 +475,15 @@ export const PointCloudHeart: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
-                      const distance = camera.position.length();
-                      const newDistance = distance + 2;  // No limit
-                      camera.position.normalize().multiplyScalar(newDistance);
+                      const controls = controlsRef.current;
+                      const direction = new THREE.Vector3();
+                      direction.subVectors(camera.position, controls.target).normalize();
+                      const currentDistance = camera.position.distanceTo(controls.target);
+                      const newDistance = Math.min(controls.maxDistance, currentDistance + 1.5);
+                      camera.position.copy(controls.target).addScaledVector(direction, newDistance);
+                      controls.update();
                     }
                   }}
                   style={{
@@ -490,17 +509,22 @@ export const PointCloudHeart: React.FC = () => {
                 <div></div>
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
-                      const angle = 0.3;  // Increased sensitivity
-                      const x = camera.position.x;
-                      const y = camera.position.y;
-                      const z = camera.position.z;
-                      const distance = Math.sqrt(x * x + z * z);
-                      const newY = y + distance * Math.sin(angle);
-                      const scale = distance / Math.sqrt(x * x + z * z + newY * newY - y * y);
-                      camera.position.set(x * scale, newY, z * scale);
-                      camera.lookAt(0, 0, 0);
+                      const controls = controlsRef.current;
+                      const angle = 0.2;
+                      const distance = camera.position.distanceTo(controls.target);
+                      const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+                      const horizontalDist = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+                      const newY = controls.target.y + distance * Math.sin(Math.asin(direction.y / distance) + angle);
+                      const newHorizontalDist = Math.sqrt(distance * distance - (newY - controls.target.y) * (newY - controls.target.y));
+                      const scale = newHorizontalDist / horizontalDist;
+                      camera.position.set(
+                        controls.target.x + direction.x * scale,
+                        newY,
+                        controls.target.z + direction.z * scale
+                      );
+                      controls.update();
                     }
                   }}
                   style={{
@@ -521,15 +545,19 @@ export const PointCloudHeart: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
-                      const angle = 0.3;  // Increased sensitivity
-                      const x = camera.position.x;
-                      const z = camera.position.z;
-                      const newX = x * Math.cos(angle) - z * Math.sin(angle);
-                      const newZ = x * Math.sin(angle) + z * Math.cos(angle);
-                      camera.position.set(newX, camera.position.y, newZ);
-                      camera.lookAt(0, 0, 0);
+                      const controls = controlsRef.current;
+                      const angle = 0.2;
+                      const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+                      const newX = direction.x * Math.cos(angle) - direction.z * Math.sin(angle);
+                      const newZ = direction.x * Math.sin(angle) + direction.z * Math.cos(angle);
+                      camera.position.set(
+                        controls.target.x + newX,
+                        camera.position.y,
+                        controls.target.z + newZ
+                      );
+                      controls.update();
                     }
                   }}
                   style={{
@@ -553,7 +581,6 @@ export const PointCloudHeart: React.FC = () => {
                       const controls = controlsRef.current;
                       camera.position.set(0, 0, 10);
                       controls.target.set(0, 0, 0);
-                      camera.lookAt(0, 0, 0);
                       controls.update();
                     }
                   }}
@@ -573,15 +600,19 @@ export const PointCloudHeart: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
+                      const controls = controlsRef.current;
                       const angle = -0.2;
-                      const x = camera.position.x;
-                      const z = camera.position.z;
-                      const newX = x * Math.cos(angle) - z * Math.sin(angle);
-                      const newZ = x * Math.sin(angle) + z * Math.cos(angle);
-                      camera.position.set(newX, camera.position.y, newZ);
-                      camera.lookAt(0, 0, 0);
+                      const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+                      const newX = direction.x * Math.cos(angle) - direction.z * Math.sin(angle);
+                      const newZ = direction.x * Math.sin(angle) + direction.z * Math.cos(angle);
+                      camera.position.set(
+                        controls.target.x + newX,
+                        camera.position.y,
+                        controls.target.z + newZ
+                      );
+                      controls.update();
                     }
                   }}
                   style={{
@@ -602,17 +633,22 @@ export const PointCloudHeart: React.FC = () => {
                 <div></div>
                 <button
                   onClick={() => {
-                    if (cameraRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const camera = cameraRef.current;
+                      const controls = controlsRef.current;
                       const angle = -0.2;
-                      const x = camera.position.x;
-                      const y = camera.position.y;
-                      const z = camera.position.z;
-                      const distance = Math.sqrt(x * x + z * z);
-                      const newY = y + distance * Math.sin(angle);
-                      const scale = distance / Math.sqrt(x * x + z * z + newY * newY - y * y);
-                      camera.position.set(x * scale, newY, z * scale);
-                      camera.lookAt(0, 0, 0);
+                      const distance = camera.position.distanceTo(controls.target);
+                      const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+                      const horizontalDist = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+                      const newY = controls.target.y + distance * Math.sin(Math.asin(direction.y / distance) + angle);
+                      const newHorizontalDist = Math.sqrt(distance * distance - (newY - controls.target.y) * (newY - controls.target.y));
+                      const scale = newHorizontalDist / horizontalDist;
+                      camera.position.set(
+                        controls.target.x + direction.x * scale,
+                        newY,
+                        controls.target.z + direction.z * scale
+                      );
+                      controls.update();
                     }
                   }}
                   style={{
@@ -640,9 +676,12 @@ export const PointCloudHeart: React.FC = () => {
                 <div></div>
                 <button
                   onClick={() => {
-                    if (controlsRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const controls = controlsRef.current;
-                      controls.target.y += 1.0;  // Increased from 0.5
+                      const camera = cameraRef.current;
+                      const panAmount = 0.5;
+                      controls.target.y += panAmount;
+                      camera.position.y += panAmount;
                       controls.update();
                     }
                   }}
@@ -664,9 +703,12 @@ export const PointCloudHeart: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    if (controlsRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const controls = controlsRef.current;
-                      controls.target.x -= 1.0;  // Increased from 0.5
+                      const camera = cameraRef.current;
+                      const panAmount = 0.5;
+                      controls.target.x -= panAmount;
+                      camera.position.x -= panAmount;
                       controls.update();
                     }
                   }}
@@ -687,9 +729,12 @@ export const PointCloudHeart: React.FC = () => {
                 <div></div>
                 <button
                   onClick={() => {
-                    if (controlsRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const controls = controlsRef.current;
-                      controls.target.x += 1.0;  // Increased from 0.5
+                      const camera = cameraRef.current;
+                      const panAmount = 0.5;
+                      controls.target.x += panAmount;
+                      camera.position.x += panAmount;
                       controls.update();
                     }
                   }}
@@ -711,9 +756,12 @@ export const PointCloudHeart: React.FC = () => {
                 <div></div>
                 <button
                   onClick={() => {
-                    if (controlsRef.current) {
+                    if (cameraRef.current && controlsRef.current) {
                       const controls = controlsRef.current;
-                      controls.target.y -= 1.0;  // Increased from 0.5
+                      const camera = cameraRef.current;
+                      const panAmount = 0.5;
+                      controls.target.y -= panAmount;
+                      camera.position.y -= panAmount;
                       controls.update();
                     }
                   }}
@@ -748,7 +796,7 @@ export const PointCloudHeart: React.FC = () => {
             fontSize: '10px',
             color: '#888'
           }}>
-            Mouse: Rotate | Wheel: Zoom
+            Mouse: Left-Drag to Rotate | Wheel to Zoom | Right-Drag to Pan
           </div>
         </div>
 
