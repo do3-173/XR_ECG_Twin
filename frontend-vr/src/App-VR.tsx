@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App-VR.css';
+import { PointCloudHeart } from './components/PointCloudHeart';
 
 interface HeartRateData {
   timestamp: string;
@@ -32,7 +33,7 @@ function App() {
   const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
   const [ecgData, setEcgData] = useState<number[]>([]);
   const [history, setHistory] = useState<Array<{ time: number; value: number; zone: number }>>([]);
-  const [selectedView, setSelectedView] = useState<'overview' | 'ecg' | 'history' | 'analysis'>('overview');
+  const [selectedView, setSelectedView] = useState<'overview' | 'ecg' | 'history' | 'analysis' | 'pointcloud'>('overview');
 
   // Analysis State
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -431,6 +432,12 @@ function App() {
           >
             Analysis
           </button>
+          <button
+            className={`view-btn ${selectedView === 'pointcloud' ? 'active' : ''}`}
+            onClick={() => setSelectedView('pointcloud')}
+          >
+            PointCloud Heart
+          </button>
         </div>
 
         {/* Overview View */}
@@ -506,7 +513,7 @@ function App() {
                 className={`control-btn ${runContinuousAnalysis ? 'stop' : 'primary'}`}
                 onClick={() => setRunContinuousAnalysis(!runContinuousAnalysis)}
               >
-                {runContinuousAnalysis ? '⏹ Stop Analysis' : '▶ Start Continuous Analysis'}
+                {runContinuousAnalysis ? '[STOP] Stop Analysis' : '[START] Start Continuous Analysis'}
               </button>
 
               <div className="analysis-status">
@@ -529,7 +536,7 @@ function App() {
                 <div className="card-header">
                   <h3>Wavelet Decomposition</h3>
                   {analysisPlots.wavelet_scales && (
-                    <button className="save-btn" onClick={(e) => savePlot('wavelet_scales', e)}>💾 Save</button>
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_scales', e)}>[SAVE]</button>
                   )}
                 </div>
                 <div className="analysis-content">
@@ -545,7 +552,7 @@ function App() {
                 <div className="card-header">
                   <h3>Cross-Correlation Matrix</h3>
                   {analysisPlots.wavelet_xcorr && (
-                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr', e)}>💾 Save</button>
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr', e)}>[SAVE]</button>
                   )}
                 </div>
                 <div className="analysis-content">
@@ -561,7 +568,7 @@ function App() {
                 <div className="card-header">
                   <h3>Cross-Correlation Sequences</h3>
                   {analysisPlots.wavelet_xcorr_sequences && (
-                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr_sequences', e)}>💾 Save</button>
+                    <button className="save-btn" onClick={(e) => savePlot('wavelet_xcorr_sequences', e)}>[SAVE]</button>
                   )}
                 </div>
                 <div className="analysis-content">
@@ -577,7 +584,7 @@ function App() {
                 <div className="card-header">
                   <h3>Network Topology (MATLAB)</h3>
                   {analysisPlots.graph_matlab && (
-                    <button className="save-btn" onClick={(e) => savePlot('graph_matlab', e)}>💾 Save</button>
+                    <button className="save-btn" onClick={(e) => savePlot('graph_matlab', e)}>[SAVE]</button>
                   )}
                 </div>
                 <div className="analysis-content">
@@ -589,6 +596,13 @@ function App() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* PointCloud Heart View */}
+        {selectedView === 'pointcloud' && (
+          <div style={{ height: 'calc(100vh - 200px)' }}>
+            <PointCloudHeart />
           </div>
         )}
 

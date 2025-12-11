@@ -270,6 +270,121 @@ The `-d` means "detached" - services run in background. To stop later:
 docker-compose down
 ```
 
+---
+
+### Step 8: Updating the Project After Changes (For Non-Technical Users)
+
+When there are updates to the GitHub repository, you'll need to pull the changes and rebuild the application. Follow these simple steps:
+
+#### Step 8.1: Pull Latest Changes Using GitHub Desktop (Easiest!)
+
+1. **Open GitHub Desktop**
+2. **Select the XR_ECG_Twin repository** (click on "Current Repository" dropdown at top if needed)
+3. **Click "Fetch origin"** button at the top
+4. **If updates are available, you'll see "Pull origin" button**
+5. **Wait for download** - Progress bar will show (usually takes 5-30 seconds)
+6. **Done!** Changes are now downloaded to your computer
+
+**Visual Guide:**
+- Look for the blue "Fetch origin" button at the top-right of GitHub Desktop
+- If changes exist, it will change to "Pull origin" with a down arrow
+- After pulling, you'll see "Last fetched just now" message
+
+#### Step 8.2: Stop Running Application (If It's Running)
+
+**Before rebuilding, you MUST stop the running application:**
+
+**Method A: Using VS Code Terminal** (if you can see the running logs)
+1. Click on the terminal where docker-compose is running
+2. Press **Ctrl + C** (Windows/Linux) or **Cmd + C** (Mac)
+3. Wait 10 seconds for services to stop
+
+**Method B: Using New Terminal** (if terminal is busy or closed)
+1. Open VS Code
+2. Open terminal: Press **Ctrl + `**
+3. Type: `docker-compose down`
+4. Press Enter
+5. Wait until you see "Removing..." messages and command prompt returns
+
+**Method C: Using Docker Desktop GUI**
+1. Open Docker Desktop
+2. Click "Containers" on left sidebar
+3. Find "xr_ecg_twin" container group
+4. Click Stop button (square icon)
+5. Wait for status to show "Exited"
+
+#### Step 8.3: Rebuild After Updates
+
+**After pulling changes from GitHub, you MUST rebuild the Docker containers to apply the updates:**
+
+1. **Make sure Docker Desktop is running** (check system tray/menu bar for Docker icon)
+2. **Open VS Code** to the XR_ECG_Twin project folder
+3. **Open terminal** in VS Code: Press **Ctrl + `**
+4. **Type this command:**
+   ```bash
+   docker-compose up --build
+   ```
+5. **Press Enter**
+
+**What this does:**
+- `--build` flag tells Docker to rebuild containers with the new code
+- This is REQUIRED after code changes - without it, you'll still run the old version!
+- First rebuild after changes: 2-5 minutes
+- Subsequent restarts: 30 seconds
+
+**You'll see:**
+- "Building frontend-vr" messages
+- "Building simulator" messages
+- "Building gateway" messages
+- Lots of colored text scrolling (this is normal!)
+- Eventually: "frontend_1", "gateway_1", "simulator_1" logs appearing
+
+#### Step 8.4: Verify Updates Are Working
+
+1. **Wait until terminal text slows down** (services are starting up)
+2. **Open your browser** and go to:
+   - Classic Interface: http://localhost:3001
+   - VR Interface: http://localhost:3002
+3. **Test the changes:**
+   - Check that ECG data is flowing (waveform moving)
+   - Check that heart rate is updating
+
+#### Quick Reference: Update Workflow
+
+```
+1. GitHub Desktop → "Fetch origin" → "Pull origin"
+2. VS Code Terminal → Ctrl+C (stop running app)
+3. VS Code Terminal → "docker-compose up --build" (rebuild)
+4. Browser → http://localhost:3001 (verify it works)
+```
+
+#### Common Questions:
+
+**Q: Do I need to rebuild every time I pull updates?**
+A: **YES!** If any code is changed (frontend, backend, services), you MUST rebuild. The `--build` flag is your friend - use it after every pull.
+
+**Q: Can I skip the --build flag?**
+A: **NO!** Docker will use old cached images and you won't see the changes. Always use `--build` after pulling updates.
+
+**Q: What if I forget to stop the app before rebuilding?**
+A: Open a NEW terminal tab (Ctrl+Shift+`) and type `docker-compose down`, then rebuild.
+
+**Q: How do I know if rebuild worked?**
+A: Look for "Successfully built" and "Successfully tagged" messages in the terminal. Then check the browser - new features should appear.
+
+**Q: Can I rebuild just one service?**
+A: Yes! You can do:
+```bash
+docker-compose stop frontend-vr
+docker-compose build frontend-vr
+docker-compose up -d frontend-vr
+```
+
+**Q: What if I see "port already in use" error?**
+A: Something is still running. Use `docker-compose down` to force stop everything, then rebuild.
+
+---
+
 ## Services Overview
 
 ### Frontend Classic (Port 3001)

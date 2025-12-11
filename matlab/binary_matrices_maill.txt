@@ -1,0 +1,19 @@
+Hi Edo and Stefania
+I hope that I understood my task, so Prof let me know if I did something wrong
+here the binary matrices, the PC in PLY format and a short description of the files:
+"ActivationSpaceSP" matrix npoints x 8 ( 8 is the number of heart's regions), the j-th column represents the j-th region and contains 1 if that point (one row) belongs to that region
+"ActivationTimeSP1" matrix 8 x nsamples, the i-th row represents the i-th region and contains 1 if that sample (one column) belongs to that region
+For a more complete data, I save also the following variables: 
+"IVT1" matrix npoints x nsamples, the amplitudes refer to depolarization and re-polarization events ( 0 points off, 1 trigger, 2 depolarization, 3 re-polarization)
+"EVT1" matrix npoints x nsamples, the amplitudes are equal to eigenbeat's amplitudes
+"t_ms" time vector in  milliseconds 1 x nsamples
+"eigenbeat" approximation of one beat, 1 x nsamples
+
+In the shared folders there is the function video_Activation that can generate the video that prof had mentioned ( I think), an example of how you can generate the video is:
+video_Activation(pc, EVT1 , eigenbeat ,t_ms,'Eigen','SaveVideo', true,'FrameRate',30)
+
+
+Thanks,
+I think Edo will only need the activation space and time vectors,
+best
+SC

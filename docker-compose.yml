@@ -208,6 +208,34 @@ services:
       - ecg_network
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8003"
 
+  # PointCloud Activation Service
+  pointcloud-service:
+    build:
+      context: ./services/pointcloud_service
+      dockerfile: Dockerfile
+    container_name: pointcloud_activation_service
+    ports:
+      - "8004:8004"
+    environment:
+      - POSTGRES_DB=ecg_db
+      - POSTGRES_USER=ecg_user
+      - POSTGRES_PASSWORD=ecg_password
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=postgresql://ecg_user:ecg_password@postgres:5432/ecg_db
+      - REDIS_URL=redis://redis:6379/4
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/pointcloud_service:/app
+      - pointcloud_media:/app/media
+    networks:
+      - ecg_network
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8004"
+
   # Frontend (React)
   frontend:
     build:
@@ -248,3 +276,4 @@ volumes:
   postgres_data:
   redis_data:
   nodered_data:
+  pointcloud_media:
